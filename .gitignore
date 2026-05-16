@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# uv / virtualenv
+.venv/
+
+# Tooling
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+
+# Pipeline I/O (user-created, large)
+inputs/
+inputs_*/
+results/
+results_*/
+plots/
+plots_*/
+logs/
+
+# Scratch snapshots
+*.zip
+*.log
+
+# Local agent state
+.claude/
