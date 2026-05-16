@@ -25,12 +25,11 @@ def _well_from_filename(filename: str) -> str | None:
 
 
 # Metrics to process: (metric_name, source_filename)
-# Detection-dependent metrics (edge spots)
+# Detection-dependent metric (edge spots). Only the per-image peripheral
+# accumulation score reported in the paper is aggregated; the legacy
+# count/nucleus, per-nucleus and edge/perinuclear metrics were dropped in v1.0.0.
 EDGE_SPOT_METRICS = [
-    ("edge_spot_fraction", "edge_spot_fraction_static.csv"),
-    ("edge_spot_intensity_per_nucleus", "edge_spot_intensity_per_nucleus_static.csv"),
     ("edge_spot_fraction_of_total_miro", "edge_spot_fraction_of_total_miro_static.csv"),
-    ("edge_spot_to_perinuclear_ratio", "edge_spot_to_perinuclear_ratio_static.csv"),
 ]
 
 # Other metrics

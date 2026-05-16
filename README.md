@@ -6,7 +6,7 @@ Paper companion to the figures in https://www.biorxiv.org/content/10.1101/2024.0
 
 Sister repos under [`gladkovalab`](https://github.com/gladkovalab):
 
-- [`micropattern_cell_analysis`](https://github.com/gladkovalab/micropattern_cell_analysis) — micropattern-constrained imaging analysis (wedge-r profiles, slab metrics)
+- [`micropattern-cell-analysis`](https://github.com/gladkovalab/micropattern-cell-analysis) — micropattern-constrained imaging analysis (wedge-r profiles, slab metrics)
 - [`synthetic-cargo-particle-tracking`](https://github.com/gladkovalab/synthetic-cargo-particle-tracking) — single-particle tracking of the same cargo, TRAK isoform conditions
 
 
@@ -18,7 +18,7 @@ For each date the pipeline:
 - Segments nuclei in the Hoechst channel via 3-class Otsu thresholding (with a smoothing pre-step).
 - Expands the nuclear mask by 10 px to define a perinuclear region for measurement, and by 15 px to define a separate exclusion mask.
 - Detects "edge spots" — bright Miro1 puncta *outside* the perinuclear region — via Robust Background thresholding on the masked 488 channel.
-- Measures perinuclear-region intensities (Gini coefficient, moments, mean intensity) and edge-spot burden (intensity per nucleus, fraction of total Miro, edge-to-perinuclear ratio).
+- Measures perinuclear-region intensities (Gini coefficient, moments, mean intensity) and the edge-spot peripheral accumulation score (edge-spot intensity as a fraction of total Miro).
 - Aggregates per-date and across-date results into figure-ready CSVs based on a condition-to-(date, well) mapping in an Excel workbook.
 
 Optional 561 co-stain mode: when an `_561.tif` is present alongside `_405`/`_488`, per-cell perinuclear 561 intensities are added to `Perinuclear_region.csv`, and the `edge-spot-cell-filter` CLI can later drop non-control cells below a per-date control percentile.
@@ -27,7 +27,7 @@ Optional 561 co-stain mode: when an `_561.tif` is present alongside `_405`/`_488
 
 - A smoothing module (median filter) before the Otsu step.
 - Border nuclei are kept for perinuclear masking (so spots near border nuclei are properly excluded) but removed for Gini analysis (where truncated perinuclear rings are problematic).
-- Additional edge spot burden metrics: intensity-based measures (total edge spot intensity, intensity per nucleus, fraction of total MIRO, edge-to-perinuclear ratio).
+- An intensity-based peripheral accumulation score: total edge-spot intensity as a fraction of total MIRO intensity (the per-image score reported in the paper), replacing the original count/nucleus edge-spot fraction. (The legacy count/nucleus, per-nucleus and edge-to-perinuclear variants were computed in earlier revisions but dropped in v1.0.0 — only the paper metric is emitted.)
 - Automatically generates the necessary figures from a spreadsheet mapping condition to (date, wellnumber).
 - Optional 561-channel co-staining: when a `_561.tif` is present alongside the `_405`/`_488` pair, the pipeline measures per-cell perinuclear 561 intensities. `edge-spot-cell-filter` can then drop non-control cells whose 561 expression falls below a per-date control percentile threshold — useful when the synthetic-cargo experiment uses an expression marker and infection efficiency varies across replicates.
 
@@ -124,23 +124,19 @@ drop-in mirror of the input results dir (`Perinuclear_region.csv`,
 `edge_spots.csv` and `Image.csv` are copied through). A `filter_summary.csv`
 at the top level records thresholds and per-well kept/total counts.
 
-Two methodological caveats are worth knowing for a methods/figures section:
+Two behaviours of the filter to be aware of:
 
-- **Controls are kept unfiltered.** The control wells define the noise-floor
-  distribution against which the threshold is computed, so they are passed
-  through in full. Only non-control cells in the listed figure sheets are
-  thresholded. This is intentional — the comparison is "test cells expressing
-  cargo above noise" vs. "the full negative-control distribution" — but the
-  asymmetry is worth stating explicitly.
+- **Control wells are passed through unfiltered.** The control condition
+  defines the noise-floor distribution used to compute the threshold, so all
+  of its cells are kept. Only non-control cells in the listed figure sheets
+  are thresholded; cells in wells absent from those sheets pass through.
 - **Edge-spot detections are not re-thresholded per cell.** Edge spots are
-  detected as standalone objects in the perinuclear region and are not tagged
-  with a parent cell, so `edge_spots.csv` is copied through unchanged.
-  Downstream metrics in `All_measurements.csv` (`edge_spot_count`,
-  `intensity_total`, `fraction_of_total_miro`, `to_perinuclear_ratio`) still
-  reflect every spot in the image, while `nuclei_count` and
-  `intensity_per_nucleus` reflect the filtered cell count. This is a sensible
-  approximation when low-561 cells contribute few/no spots, but the
-  numerator/denominator asymmetry should be flagged in the methods.
+  detected as standalone objects and are not tagged with a parent cell, so
+  `edge_spots.csv` is copied through unchanged and the edge-spot columns in
+  `All_measurements.csv` (`edge_spot_count`, `intensity_total`,
+  `fraction_of_total_miro`) still reflect every spot in the image, while the
+  `Nuclei` counts reflect the filtered cell count. This is an approximation
+  that holds when low-561 cells contribute few or no spots.
 
 ## Input Data Format
 
@@ -219,7 +215,7 @@ results/
       ├── edge_spots.csv                # Edge spot measurements
       ├── Image.csv                     # Image-level statistics
       ├── All_measurements.csv          # Combined summary
-      ├── edge_spot_fraction_static.csv # Edge spot fractions per well
+      ├── edge_spot_fraction_of_total_miro_static.csv  # Peripheral accumulation score per well
       ├── GINI_Gini_MIRO160mer_fov_median_static.csv  # Gini per FOV
       └── ...
 ```
@@ -241,13 +237,14 @@ results/
 - **Gini coefficient** (`GINI_Gini_MIRO160mer`): Inequality measure (0=uniform, 1=concentrated)
 - **Mass displacement** (`Intensity_MassDisplacement_MIRO160mer`): Distance between intensity and geometric centroids
 - **Moments**: Mean, standard deviation, skewness, kurtosis
-- **Edge spot fraction**: Edge spot count / nuclei count per field of view
+- **Peripheral accumulation score** (`edge_spot_fraction_of_total_miro`): total edge-spot MIRO intensity / total MIRO intensity per field of view (normalized to control per replicate for the paper figures)
 
 ## Algorithm Details
 
 ### Nuclei Segmentation (Module 7)
 - **Method**: 3-class Otsu thresholding (uses upper threshold)
-- **Smoothing**: Gaussian (σ=1.0, from threshold smoothing scale=2.0)
+- **Pre-smoothing**: median filter (3 px artifact diameter) applied to the Hoechst channel before thresholding (CellProfiler Smooth module)
+- **Threshold smoothing**: additional Gaussian (σ=1.0, from threshold smoothing scale=2.0) applied internally before the Otsu step
 - **Declumping**: Intensity-based watershed with min_distance=30px
 - **Size filtering**: 30-100 pixel diameter
 - **Border removal**: Yes

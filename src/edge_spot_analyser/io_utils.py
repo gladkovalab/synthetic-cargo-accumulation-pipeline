@@ -484,9 +484,7 @@ class CSVExporter:
 
         Includes edge spot burden metrics:
         - edge_spot_intensity_total
-        - edge_spot_intensity_per_nucleus
         - edge_fraction_of_total_miro
-        - edge_to_perinuclear_ratio
 
         Args:
             combined: Dictionary of combined measurements
@@ -524,9 +522,7 @@ class CSVExporter:
 
             # Get edge spot burden metrics (detection-dependent)
             edge_spot_intensity_total = img_row.get("edge_spot_intensity_total", 0.0)
-            edge_spot_intensity_per_nucleus = img_row.get("edge_spot_intensity_per_nucleus", 0.0)
             edge_fraction_of_total_miro = img_row.get("edge_fraction_of_total_miro", 0.0)
-            edge_to_perinuclear_ratio = img_row.get("edge_to_perinuclear_ratio", 0.0)
 
             rows.append(
                 {
@@ -538,9 +534,7 @@ class CSVExporter:
                     # Edge spot metrics (detection-dependent)
                     ("edge_spots", "Number_Object_Number"): edge_spot_count,
                     ("edge_spots", "intensity_total"): edge_spot_intensity_total,
-                    ("edge_spots", "intensity_per_nucleus"): edge_spot_intensity_per_nucleus,
                     ("edge_spots", "fraction_of_total_miro"): edge_fraction_of_total_miro,
-                    ("edge_spots", "to_perinuclear_ratio"): edge_to_perinuclear_ratio,
                 }
             )
 

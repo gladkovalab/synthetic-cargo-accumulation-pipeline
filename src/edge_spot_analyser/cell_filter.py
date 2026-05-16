@@ -9,9 +9,9 @@ are passed through.
 
 Outputs a filtered mirror of the input results dir: filtered
 ``Perinuclear_region.csv`` / ``Nuclei.csv`` / ``Expand_Nuclei.csv`` per date,
-plus an updated ``All_measurements.csv`` whose nuclei counts and
-``edge_spot_intensity_per_nucleus`` reflect the filter. ``edge_spots.csv`` and
-``Image.csv`` are copied through unchanged. A ``filter_summary.csv`` summary
+plus an updated ``All_measurements.csv`` whose nuclei counts reflect the
+filter. ``edge_spots.csv`` and ``Image.csv`` are copied through unchanged.
+A ``filter_summary.csv`` summary
 of thresholds and per-well kept/total counts is written at the top level.
 
 Run via:
@@ -150,16 +150,12 @@ def _filter_one_date(
         all_df = pd.read_csv(all_csv, header=[0, 1])
         counts_by_image = peri_kept.groupby("ImageNumber").size().to_dict()
         new_n: list[int] = []
-        new_per_nucleus: list[float] = []
         for _, row in all_df.iterrows():
             img_no = int(row[("Image", "ImageNumber")])
             n = int(counts_by_image.get(img_no, 0))
             new_n.append(n)
-            intensity_total = float(row[("edge_spots", "intensity_total")])
-            new_per_nucleus.append(intensity_total / n if n > 0 else 0.0)
         all_df[("Nuclei", "Number_Object_Number")] = new_n
         all_df[("Nuclei", "Count_Interior")] = new_n
-        all_df[("edge_spots", "intensity_per_nucleus")] = new_per_nucleus
         all_df.to_csv(dst_dir / "All_measurements.csv", index=False)
 
     summary: dict = {"date": date, "threshold": threshold}

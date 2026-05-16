@@ -19,16 +19,16 @@ class TestLoadWellData:
         # time-varying dates, but test fallback anyway)
         df_all = pd.DataFrame({"B02": [0.1, 0.2], "B03": [0.3, 0.4]}, index=[1, 2])
         df_all.index.name = "XY"
-        df_all.to_csv(date_dir / "edge_spot_fraction_static.csv")
+        df_all.to_csv(date_dir / "edge_spot_fraction_of_total_miro_static.csv")
 
         # Per-timepoint static files
         df_t1 = pd.DataFrame({"B02": [0.11, 0.21], "B03": [0.31, 0.41]}, index=[1, 2])
         df_t1.index.name = "XY"
-        df_t1.to_csv(date_dir / "edge_spot_fraction_static_t1.csv")
+        df_t1.to_csv(date_dir / "edge_spot_fraction_of_total_miro_static_t1.csv")
 
         df_t2 = pd.DataFrame({"B02": [0.12, 0.22], "B03": [0.32, 0.42]}, index=[1, 2])
         df_t2.index.name = "XY"
-        df_t2.to_csv(date_dir / "edge_spot_fraction_static_t2.csv")
+        df_t2.to_csv(date_dir / "edge_spot_fraction_of_total_miro_static_t2.csv")
 
         return tmp_path
 
@@ -49,20 +49,20 @@ class TestLoadWellData:
         )
 
     def test_load_without_timepoint(self, aggregator):
-        series = aggregator._load_well_data("221216", "B02", "edge_spot_fraction_static.csv")
+        series = aggregator._load_well_data("221216", "B02", "edge_spot_fraction_of_total_miro_static.csv")
         assert series is not None
         assert list(series.values) == [0.1, 0.2]
 
     def test_load_with_timepoint_uses_tp_file(self, aggregator):
         series = aggregator._load_well_data(
-            "221216", "B02", "edge_spot_fraction_static.csv", timepoint="t1"
+            "221216", "B02", "edge_spot_fraction_of_total_miro_static.csv", timepoint="t1"
         )
         assert series is not None
         assert list(series.values) == [0.11, 0.21]
 
     def test_load_with_timepoint_t2(self, aggregator):
         series = aggregator._load_well_data(
-            "221216", "B03", "edge_spot_fraction_static.csv", timepoint="t2"
+            "221216", "B03", "edge_spot_fraction_of_total_miro_static.csv", timepoint="t2"
         )
         assert series is not None
         assert list(series.values) == [0.32, 0.42]
@@ -70,15 +70,15 @@ class TestLoadWellData:
     def test_load_with_missing_timepoint_falls_back(self, aggregator):
         """If the per-timepoint file doesn't exist, fall back to the base file."""
         series = aggregator._load_well_data(
-            "221216", "B02", "edge_spot_fraction_static.csv", timepoint="t99"
+            "221216", "B02", "edge_spot_fraction_of_total_miro_static.csv", timepoint="t99"
         )
         assert series is not None
         assert list(series.values) == [0.1, 0.2]
 
     def test_load_missing_well_returns_none(self, aggregator):
-        series = aggregator._load_well_data("221216", "Z99", "edge_spot_fraction_static.csv")
+        series = aggregator._load_well_data("221216", "Z99", "edge_spot_fraction_of_total_miro_static.csv")
         assert series is None
 
     def test_load_missing_date_returns_none(self, aggregator):
-        series = aggregator._load_well_data("999999", "B02", "edge_spot_fraction_static.csv")
+        series = aggregator._load_well_data("999999", "B02", "edge_spot_fraction_of_total_miro_static.csv")
         assert series is None

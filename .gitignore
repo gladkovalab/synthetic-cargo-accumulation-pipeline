@@ -37,5 +37,8 @@ logs/
 *.zip
 *.log
 
+# Local reproduction scaffold (machine-specific; reproduction is documented in README)
+run_reproduction.sh
+
 # Local agent state
 .claude/

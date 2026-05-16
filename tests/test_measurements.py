@@ -89,13 +89,10 @@ class TestMeasureBasicIntensity:
 
 class TestMeasureEdgeSpotBurden:
     def test_known_geometry(self):
-        """Known geometry should produce expected ratios."""
+        """Known geometry should produce expected fraction-of-total-MIRO."""
         # Create a simple scenario
         edge_spots = np.zeros((100, 100), dtype=int)
         edge_spots[80:90, 80:90] = 1  # 100 pixels of edge spots
-
-        perinuclear = np.zeros((100, 100), dtype=int)
-        perinuclear[10:30, 10:30] = 1  # 400 pixels of perinuclear
 
         # Uniform intensity image
         miro = np.full((100, 100), 0.5, dtype=np.float64)
@@ -103,39 +100,32 @@ class TestMeasureEdgeSpotBurden:
         metrics = measure_edge_spot_burden(
             edge_spots_labels=edge_spots,
             miro_image=miro,
-            perinuclear_region_labels=perinuclear,
-            nuclei_count=5,
         )
 
         # Edge spot intensity: 100 pixels * 0.5 = 50.0
         assert abs(metrics["edge_spot_intensity_total"] - 50.0) < 1e-6
 
-        # Per nucleus: 50.0 / 5 = 10.0
-        assert abs(metrics["edge_spot_intensity_per_nucleus"] - 10.0) < 1e-6
-
         # Fraction of total: 50.0 / (100*100*0.5) = 50/5000 = 0.01
         assert abs(metrics["edge_fraction_of_total_miro"] - 0.01) < 1e-6
 
-        # Edge/perinuclear ratio: 50.0 / (400*0.5) = 50/200 = 0.25
-        assert abs(metrics["edge_to_perinuclear_ratio"] - 0.25) < 1e-6
+        # Pruned metrics must no longer be emitted
+        assert "edge_spot_intensity_per_nucleus" not in metrics
+        assert "edge_to_perinuclear_ratio" not in metrics
 
     def test_no_edge_spots(self):
         """No edge spots should give zero metrics."""
         edge_spots = np.zeros((50, 50), dtype=int)
-        perinuclear = np.zeros((50, 50), dtype=int)
-        perinuclear[10:20, 10:20] = 1
         miro = np.full((50, 50), 0.5, dtype=np.float64)
 
-        metrics = measure_edge_spot_burden(edge_spots, miro, perinuclear, nuclei_count=3)
+        metrics = measure_edge_spot_burden(edge_spots, miro)
         assert metrics["edge_spot_intensity_total"] == 0.0
-        assert metrics["edge_spot_intensity_per_nucleus"] == 0.0
+        assert metrics["edge_fraction_of_total_miro"] == 0.0
 
-    def test_zero_nuclei(self):
-        """Zero nuclei count should return zero per-nucleus metric."""
+    def test_zero_total_miro(self):
+        """Zero total MIRO intensity should return zero fraction (no div-by-zero)."""
         edge_spots = np.zeros((50, 50), dtype=int)
         edge_spots[5:10, 5:10] = 1
-        perinuclear = np.zeros((50, 50), dtype=int)
-        miro = np.full((50, 50), 0.5, dtype=np.float64)
+        miro = np.zeros((50, 50), dtype=np.float64)
 
-        metrics = measure_edge_spot_burden(edge_spots, miro, perinuclear, nuclei_count=0)
-        assert metrics["edge_spot_intensity_per_nucleus"] == 0.0
+        metrics = measure_edge_spot_burden(edge_spots, miro)
+        assert metrics["edge_fraction_of_total_miro"] == 0.0

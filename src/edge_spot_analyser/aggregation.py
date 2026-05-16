@@ -13,7 +13,6 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 
 logger = logging.getLogger(__name__)
@@ -98,7 +97,8 @@ class Aggregator:
 
     def _process_edge_spots(self, input_path: Path, output_dir: Path) -> None:
         """
-        Generate edge_spot_count / nuclei_count for each field of view.
+        Generate the per-image peripheral accumulation score
+        (edge_spot_fraction_of_total_miro) for each field of view.
 
         Args:
             input_path: Path to All_measurements.csv
@@ -111,7 +111,7 @@ class Aggregator:
         processed_df = self._extract_edgespot_cols(raw_df)
 
         # Save intermediate raw data
-        intermediate_path = output_dir / "edge_spot_fraction_raw.csv"
+        intermediate_path = output_dir / "edge_spot_metrics_raw.csv"
         processed_df.to_csv(intermediate_path, index=False)
         logger.info(f"Wrote edge spot intermediate to {intermediate_path}")
 
@@ -128,12 +128,10 @@ class Aggregator:
                 self._generate_edge_spot_static_files(t_df, output_dir, timepoint=f"t{t_val}")
 
     def _extract_edgespot_cols(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Extract well number, XY, T and aggregate to get edge spot fraction and burden metrics."""
+        """Extract well number, XY, T and the per-image edge-spot burden metrics."""
         logger.info(f"Extracting edge spot columns, input shape {df.shape}")
 
         filename_column = "FileName_Hoechst"
-        nuclei_count_column = "Number_Object_Number"
-        edge_spot_count_column = "Number_Object_Number"
 
         output_df = df.copy()
 
@@ -141,22 +139,18 @@ class Aggregator:
         output_df["T"] = output_df["Image"][filename_column].apply(extract_timestamp)
         output_df["XY"] = output_df["Image"][filename_column].apply(extract_xy)
         output_df["WellNumber"] = output_df["Image"][filename_column].apply(extract_wellnumber)
-        output_df["nuclei_count"] = output_df["Nuclei"][nuclei_count_column]
-        output_df["edge_spot_count"] = output_df["edge_spots"][edge_spot_count_column]
 
-        # Extract edge spot burden metrics (detection-dependent)
+        # Extract edge spot burden metrics (detection-dependent). All_measurements.csv
+        # has one row per image, so no aggregation is needed here.
         burden_cols = [
             "intensity_total",
-            "intensity_per_nucleus",
             "fraction_of_total_miro",
-            "to_perinuclear_ratio",
         ]
         for col in burden_cols:
             if ("edge_spots", col) in df.columns:
                 output_df[f"edge_spot_{col}"] = df["edge_spots"][col]
 
-        cols = ["WellNumber", "XY", "T", "nuclei_count", "edge_spot_count"]
-        # Add edge spot burden metric columns if present
+        cols = ["WellNumber", "XY", "T"]
         for col in burden_cols:
             col_name = f"edge_spot_{col}"
             if col_name in output_df.columns:
@@ -168,53 +162,14 @@ class Aggregator:
         if isinstance(output_df.columns, pd.MultiIndex):
             output_df.columns = output_df.columns.droplevel(1)
 
-        # All_measurements.csv has ONE ROW PER IMAGE with actual counts
-        # (e.g., 176 nuclei, 7 edge spots) - no aggregation needed
-        # Calculate edge spot fraction directly, handling division by zero
-        output_df["edge_spot_fraction"] = output_df["edge_spot_count"] / output_df[
-            "nuclei_count"
-        ].replace(0, np.nan)
-
         logger.info(f"Extracted edge spot data, output shape {output_df.shape}")
         return output_df
 
     def _generate_edge_spot_time_files(self, df: pd.DataFrame, output_dir: Path) -> None:
-        """Generate time-course edge spot files."""
-        # File for each well number, T as columns, XY as rows
-        for well_number in df.WellNumber.unique():
-            well_df = df[df.WellNumber == well_number]
-            output_path = output_dir / f"edge_spot_fraction_over_time_{well_number}.csv"
-            self._save_pivot_table(
-                data=well_df,
-                values="edge_spot_fraction",
-                index="XY",
-                columns="T",
-                output_path=output_path,
-            )
-
-        # Average over XYs, normalise and optionally plot
-        average_over_time = df.groupby(["WellNumber", "T"]).edge_spot_fraction.mean().reset_index()
-        pivot = pd.pivot_table(
-            data=average_over_time,
-            values="edge_spot_fraction",
-            index="T",
-            columns="WellNumber",
-        )
-        # Only normalize if first row has non-zero values
-        if (pivot.iloc[0] != 0).all():
-            pivot = pivot.divide(pivot.iloc[0])
-        output_path = output_dir / "edge_spot_fraction_mean_over_time_normalised.csv"
-        logger.info(f"Writing normalised pivot table to {output_path}")
-        pivot.to_csv(output_path)
-
-        if self.config.plot:
-            self._plot_time_series(pivot, "Edge spot fraction over time, normalised to T0")
-
-        # Generate time files for edge spot burden metrics (detection-dependent)
+        """Generate time-course files for the per-image peripheral accumulation score."""
+        # Time files for edge spot burden metrics (detection-dependent)
         burden_metrics = [
-            ("edge_spot_intensity_per_nucleus", "edge_spot_intensity_per_nucleus"),
             ("edge_spot_fraction_of_total_miro", "edge_spot_fraction_of_total_miro"),
-            ("edge_spot_to_perinuclear_ratio", "edge_spot_to_perinuclear_ratio"),
         ]
         for col_name, file_prefix in burden_metrics:
             if col_name not in df.columns:
@@ -252,21 +207,10 @@ class Aggregator:
     ) -> None:
         """Generate static (single timepoint) edge spot files."""
         suffix = f"_{timepoint}" if timepoint else ""
-        # Original edge spot fraction
-        output_path = output_dir / f"edge_spot_fraction_static{suffix}.csv"
-        self._save_pivot_table(
-            data=df,
-            values="edge_spot_fraction",
-            index="XY",
-            columns="WellNumber",
-            output_path=output_path,
-        )
 
-        # Generate files for edge spot burden metrics (detection-dependent)
+        # Static files for edge spot burden metrics (detection-dependent)
         burden_metrics = [
-            ("edge_spot_intensity_per_nucleus", "edge_spot_intensity_per_nucleus_static"),
             ("edge_spot_fraction_of_total_miro", "edge_spot_fraction_of_total_miro_static"),
-            ("edge_spot_to_perinuclear_ratio", "edge_spot_to_perinuclear_ratio_static"),
         ]
         for col_name, file_stem in burden_metrics:
             if col_name in df.columns:

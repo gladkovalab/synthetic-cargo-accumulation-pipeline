@@ -298,32 +298,24 @@ def _calculate_gini_on_pixels(pixels: np.ndarray) -> float:
 def measure_edge_spot_burden(
     edge_spots_labels: np.ndarray,
     miro_image: np.ndarray,
-    perinuclear_region_labels: np.ndarray,
-    nuclei_count: int,
 ) -> dict[str, float]:
     """
-    Calculate intensity-based edge spot metrics (detection-dependent).
-
-    These metrics capture cargo accumulation at cell edges more accurately than
-    simple edge spot count / nuclei count.
+    Calculate the peripheral cargo-accumulation metric (detection-dependent).
 
     Metrics:
     - edge_spot_intensity_total: Sum of MIRO intensity in all edge spots
-    - edge_spot_intensity_per_nucleus: Total edge spot intensity / nuclei count
-    - edge_fraction_of_total_miro: Edge spot intensity / total MIRO intensity
-    - edge_to_perinuclear_ratio: Edge spot intensity / perinuclear intensity
+    - edge_fraction_of_total_miro: Edge spot intensity / total MIRO intensity.
+      This is the per-image peripheral accumulation score reported in the paper
+      (edge_spot_fraction_of_total_miro, normalized to control per replicate).
 
     Args:
         edge_spots_labels: Labeled image of detected edge spots
         miro_image: Original MIRO160mer intensity image (not masked)
-        perinuclear_region_labels: Labeled image of perinuclear ring regions
-        nuclei_count: Number of nuclei (use all nuclei count, not interior only)
 
     Returns:
         Dictionary with edge spot burden metrics
     """
     edge_mask = edge_spots_labels > 0
-    perinuclear_mask = perinuclear_region_labels > 0
 
     # Calculate edge spot intensity
     edge_intensity = float(miro_image[edge_mask].sum()) if edge_mask.any() else 0.0
@@ -331,27 +323,13 @@ def measure_edge_spot_burden(
     # Calculate total MIRO intensity
     total_miro_intensity = float(miro_image.sum())
 
-    # Calculate perinuclear intensity
-    perinuclear_intensity = (
-        float(miro_image[perinuclear_mask].sum()) if perinuclear_mask.any() else 0.0
-    )
-
-    # Calculate metrics
-    edge_spot_intensity_per_nucleus = edge_intensity / nuclei_count if nuclei_count > 0 else 0.0
-
     edge_fraction_of_total_miro = (
         edge_intensity / total_miro_intensity if total_miro_intensity > 0 else 0.0
     )
 
-    edge_to_perinuclear_ratio = (
-        edge_intensity / perinuclear_intensity if perinuclear_intensity > 0 else 0.0
-    )
-
     return {
         "edge_spot_intensity_total": edge_intensity,
-        "edge_spot_intensity_per_nucleus": edge_spot_intensity_per_nucleus,
         "edge_fraction_of_total_miro": edge_fraction_of_total_miro,
-        "edge_to_perinuclear_ratio": edge_to_perinuclear_ratio,
     }
 
 
@@ -656,8 +634,6 @@ def combine_measurements_for_export(
     edge_burden = measure_edge_spot_burden(
         edge_spots_labels=edge_spots_labels,
         miro_image=miro_image,
-        perinuclear_region_labels=perinuclear_region_labels,
-        nuclei_count=nuclei_count_all,  # Use all nuclei for denominator
     )
 
     # Add nuclei counts to image measurements
