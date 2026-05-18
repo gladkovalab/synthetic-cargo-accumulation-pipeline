@@ -1,5 +1,7 @@
 # Synthetic cargo accumulation pipeline
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20263175.svg)](https://doi.org/10.5281/zenodo.20263175)
+
 Image-analysis pipeline that quantifies the spatial distribution of a Miro1-based synthetic cargo across fluorescence microscopy fields: nuclear segmentation, perinuclear-ring intensity (with Gini, moments, mass-displacement), and detection of "edge spots" outside the ring. Produces per-date CSV outputs and cross-date figure tables, plus an optional cell-level filter for an `_561` co-stain channel.
 
 Paper companion to the figures in https://www.biorxiv.org/content/10.1101/2024.09.13.612963v1 — a Python re-implementation of the original CellProfiler pipeline used in the preprint (spec preserved in `pipeline_files/`). The Python port was undertaken during the revision process so we could re-run with different parameters and add additional metrics; see "Differences from the CellProfiler pipeline" below.
